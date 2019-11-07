@@ -7,8 +7,9 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using WizdomClientStd;
 
-namespace WizdomClientStd
+namespace TestClient
 {
     public class DeviceCodeTokenHandler : ITokenHandler
     {

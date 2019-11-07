@@ -1,3 +1,7 @@
-Nuget publish key: oy2dxjz262c7zq7riugqhezll7vikope3d5u3f67n2u4ju
+Wizdom Client Readme
 
-dotnet nuget push Wizdom.WizdomClient.0.0.0.2.nupkg -k oy2dxjz262c7zq7riugqhezll7vikope3d5u3f67n2u4ju -s https://api.nuget.org/v3/index.json
+Use this client to connect to Wizdom instances through the Wizdom Unified Gateway. 
+
+Please inspect the TestClient project for usage details, until documentation is written. 
+
+Package available from nuget: https://www.nuget.org/packages/Wizdom.WizdomClient/

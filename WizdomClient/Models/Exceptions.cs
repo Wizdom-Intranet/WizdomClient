@@ -4,7 +4,7 @@ using System.Net;
 using System.Runtime.Serialization;
 using System.Text;
 
-namespace WizdomClientStd
+namespace Wizdom.Client
 {
     public class AccessDeniedException: Exception
     {

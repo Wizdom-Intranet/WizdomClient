@@ -7,7 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using WizdomClientStd;
+using Wizdom.Client;
 
 namespace TestClient
 {
@@ -18,7 +18,7 @@ namespace TestClient
         {
             get
             {
-                if (_authContext == null) _authContext = PublicClientApplicationBuilder
+                if (_authContext == null && !string.IsNullOrEmpty(clientId)) _authContext = PublicClientApplicationBuilder
                     .Create(clientId) //Note - a bit messy - but clientid must always be set, before accessing this property...
                     .WithAuthority(Authority)
                     .WithDefaultRedirectUri()
@@ -38,8 +38,9 @@ namespace TestClient
         {
             this.clientId = clientId;
 
+            if (AuthContext == null) return null;
 
-            var accounts = await AuthContext.GetAccountsAsync();
+            var accounts = await AuthContext?.GetAccountsAsync();
 
             //        new KeyValuePair<string, string>("scope", resourceId != null ? resourceId + "/.default offline_access" : clientId + "/.default offline_access") //Ensure resourceid ends with / and add another for the .default scope so it ends up being //
             string[] scopes = new string[] { "offline_access", resourceId != null ? resourceId + "/.default" : clientId + "/.default" };
@@ -47,7 +48,7 @@ namespace TestClient
             // All AcquireToken* methods store the tokens in the cache, so check the cache first
             try
             {
-                var tokenResult = await AuthContext.AcquireTokenSilent(scopes, accounts.FirstOrDefault()).ExecuteAsync();
+                var tokenResult = await AuthContext?.AcquireTokenSilent(scopes, accounts.FirstOrDefault()).ExecuteAsync();
                 return tokenResult.AccessToken;
             }
             catch (MsalUiRequiredException ex)
@@ -65,7 +66,7 @@ namespace TestClient
         {
             try
             {
-                var result = await pca.AcquireTokenWithDeviceCode(scopes, deviceCodeResult =>
+                var result = await pca?.AcquireTokenWithDeviceCode(scopes, deviceCodeResult =>
                 {
                     // This will print the message on the console which tells the user where to go sign-in using 
                     // a separate browser and the code to enter once they sign in.
@@ -118,7 +119,16 @@ namespace TestClient
             return null;
         }
 
+        public async Task LogOutAsync()
+        {
+            if (AuthContext == null) return;
 
+            var accounts = await AuthContext?.GetAccountsAsync();
+            foreach (var account in accounts)
+            {
+                await AuthContext?.RemoveAsync(account);
+            }
+        }
 
         //public async Task<string> GetToken(string clientId, string resourceId = null)
         //{

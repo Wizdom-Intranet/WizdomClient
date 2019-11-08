@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace WizdomClientStd
+namespace Wizdom.Client
 {
     public class Principal
     {

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net461</TargetFrameworks>
-    <Version>0.0.0.6</Version>
+    <Version>0.0.0.8</Version>
     <Authors>Wizdom A/S</Authors>
     <Company>Wizdom A/S</Company>
     <PackageId>Wizdom.WizdomClient</PackageId>
@@ -11,6 +11,7 @@
     <Description>Enables easy communication with Wizdom backend via REST by using the Wizdom Unified Gateway. For example client, check github: https://github.com/Wizdom-Intranet/WizdomClient</Description>
     <PackageProjectUrl>https://github.com/Wizdom-Intranet/WizdomClient</PackageProjectUrl>
     <RepositoryUrl></RepositoryUrl>
+    <RootNamespace>Wizdom.Client</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />

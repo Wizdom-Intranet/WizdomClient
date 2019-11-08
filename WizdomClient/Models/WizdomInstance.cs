@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Wizdom.Client
 {
-    public class WizdomTenant
+    public class WizdomInstance
     {
         public int LicenseID { get; set; }
         public string TenantId { get; set; }

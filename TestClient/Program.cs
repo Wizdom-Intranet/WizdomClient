@@ -40,36 +40,67 @@ Enter command (1, 2 | q) > ");
                 Console.WriteLine("");
                 Console.WriteLine("");
 
+
+                WizdomClient.LoggerDelegate logger = delegate (string message, WizdomClient.LogLevel level)
+                {
+                    if (level == WizdomClient.LogLevel.info) return; //ignore info...
+
+                    var newColor = ConsoleColor.Gray;
+                    switch (level)
+                    {
+                        case WizdomClient.LogLevel.info:
+                            newColor = ConsoleColor.Gray;
+                            break;
+                        case WizdomClient.LogLevel.warn:
+                            newColor = ConsoleColor.Yellow;
+                            break;
+                        case WizdomClient.LogLevel.error:
+                            newColor = ConsoleColor.Red;
+                            break;
+                        default:
+                            break;
+                    }
+                    var old = Console.ForegroundColor;
+                    Console.ForegroundColor = newColor;
+                    Console.WriteLine(message);
+                    Console.ForegroundColor = old;
+                };
+
+                WizdomClient.InstanceDecisionHandlerDelegate instanceDecisionHandler = async delegate (List<WizdomInstance> instances)
+                {
+                    if ((instances?.Count ?? 0) == 0) return 0;
+
+                    if (instances.Count == 1) return instances[0].LicenseID;
+
+                    while (true)
+                    {
+                        int i = 1;
+                        foreach (var instance in instances)
+                        {
+                            Console.WriteLine($"{i}. {instance.LicenseName}");
+                            i++;
+                        }
+                        Console.Write("Choose instance > ");
+                        var k = Console.ReadKey().KeyChar.ToString();
+                        int iKey;
+                        if (int.TryParse(k, out iKey) && iKey < i && iKey > 0)
+                        {
+                            Console.WriteLine("");
+                            Console.WriteLine("");
+                            return instances[iKey - 1].LicenseID;
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("Please choose instance!");
+                        }
+                    }
+                };
+
                 switch (commandString.ToLower())
                 {
                     case "1":
-                        wizdomclient = new WizdomClient(new DeviceCodeTokenHandler())
-                        {
-                            log = delegate (string message, WizdomClient.LogLevel level)
-                            {
-                                if (level == WizdomClient.LogLevel.info) return; //ignore info...
-
-                                var newColor = ConsoleColor.Gray;
-                                switch (level)
-                                {
-                                    case WizdomClient.LogLevel.info:
-                                        newColor = ConsoleColor.Gray;
-                                        break;
-                                    case WizdomClient.LogLevel.warn:
-                                        newColor = ConsoleColor.Yellow;
-                                        break;
-                                    case WizdomClient.LogLevel.error:
-                                        newColor = ConsoleColor.Red;
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                var old = Console.ForegroundColor;
-                                Console.ForegroundColor = newColor;
-                                Console.WriteLine(message);
-                                Console.ForegroundColor = old;
-                            }
-                        };
+                        wizdomclient = new WizdomClient(new DeviceCodeTokenHandler()) { Logger = logger, InstanceDecisionHandler = instanceDecisionHandler };
                         commandString = "continue";
                         break;
                     case "2":
@@ -90,7 +121,7 @@ Enter command (1, 2 | q) > ");
                                 Console.WriteLine();
                             }
                             return token;
-                        }));
+                        }, async delegate () { token = string.Empty; })) { Logger = logger, InstanceDecisionHandler = instanceDecisionHandler };
                         commandString = "continue";
                         break;
                     case "q":
@@ -101,7 +132,6 @@ Enter command (1, 2 | q) > ");
                         Console.WriteLine("Invalid command.");
                         break;
                 }
-
             }
             Console.WriteLine();
 
@@ -128,7 +158,8 @@ Enter command (1, 2, 3, 4, 5, 6 | q) > ");
                 switch (commandString.ToLower())
                 {
                     case "1":
-                        var environment = await ConnectToInstanceAsync();
+                        var environment = await wizdomclient.ConnectAsync();
+                        //var environment = await ConnectToInstanceAsync();
                         if (environment != null) Console.WriteLine($"Connected to {environment.appUrl} running Wizdom v.{environment.wizdomVersion.ToString()} as {environment.currentPrincipal.loginName}");
                         else Console.WriteLine("Error connecting!");
                         break;
@@ -155,37 +186,6 @@ Enter command (1, 2, 3, 4, 5, 6 | q) > ");
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine("Invalid command.");
                         break;
-                }
-            }
-        }
-
-        private static async Task<Wizdom.Client.Environment> ConnectToInstanceAsync()
-        {
-            var instances = await wizdomclient.GetInstancesAsync();
-            if ((instances?.Count ?? 0) == 0) return null;
-
-            if (instances.Count == 1) return await wizdomclient.ConnectAsync(instances[0].LicenseID);
-
-            while (true)
-            {
-                int i = 1;
-                foreach (var instance in instances)
-                {
-                    Console.WriteLine($"{i}. {instance.LicenseName}");
-                    i++;
-                }
-                Console.Write("Choose instance > ");
-                var k = Console.ReadKey().KeyChar.ToString();
-                int iKey;
-                if (int.TryParse(k, out iKey) && iKey < i && iKey > 0)
-                {
-                    Console.WriteLine("");
-                    return await wizdomclient.ConnectAsync(instances[iKey - 1].LicenseID);
-                }
-                else
-                {
-                    Console.WriteLine();
-                    Console.WriteLine("Please choose instance!");
                 }
             }
         }

@@ -18,15 +18,18 @@ namespace Wizdom.Client
             _tokenHandler = tokenHandler;
         }
 
-        public delegate void Log(string message, LogLevel level);
-        public Log log { get; set; }
+        public delegate Task<int> InstanceDecisionHandlerDelegate(List<WizdomInstance> instances);
+        public InstanceDecisionHandlerDelegate InstanceDecisionHandler { get; set; }
+
+        public delegate void LoggerDelegate(string message, LogLevel level);
+        public LoggerDelegate Logger { get; set; }
 
         private const string clientId = "402cbaeb-c52a-43b6-b886-4ad1c44cab6a";
         private const string baseAddress = "https://api.wizdom-intranet.com";
 
         private int _wizdomLicenseId = 0;
         private ITokenHandler _tokenHandler;
-        private List<WizdomTenant> _wizdomTenants = null;
+        private List<WizdomInstance> _wizdomInstances = null;
         #endregion
 
         #region Public
@@ -38,21 +41,37 @@ namespace Wizdom.Client
         #region Client methods
         public async Task<Environment> ConnectAsync(int licenseId = 0, bool useProxy = false)
         {
-            log?.Invoke($"Connecting to {licenseId}", LogLevel.info);
+            Logger?.Invoke($"Connecting to {licenseId}", LogLevel.info);
             _wizdomLicenseId = licenseId;
             return await GetObjectAsync<Environment>("/api/wizdom/noticeboard/environment", useProxy: useProxy);
         }
         public async Task DisconnectAsync()
         {
-            log?.Invoke("Disconnecting", LogLevel.info);
-            await _tokenHandler.LogOutAsync();
+            Logger?.Invoke("Disconnecting", LogLevel.info);
+            _wizdomInstances = null;
             _wizdomLicenseId = 0;
+            await _tokenHandler.LogOutAsync();
             return;
         }
-        public async Task<List<WizdomTenant>> GetInstancesAsync()
+        public async Task<List<WizdomInstance>> GetInstancesAsync()
         {
-            return await GetTenantConfigs();
+            if (_wizdomInstances != null) return _wizdomInstances;
+
+            string token = await _tokenHandler?.GetTokenAsync(clientId);
+
+            HttpClientHandler handler = new HttpClientHandler();
+            handler.AllowAutoRedirect = true;
+            handler.MaxAutomaticRedirections = 10;
+            var client = new HttpClient(handler);
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            HttpResponseMessage response = await client.GetAsync(baseAddress + "/disco");
+
+            if (response.IsSuccessStatusCode) return await DeserializeStreamAsync<List<WizdomInstance>>(response);
+
+            throw new ServerException("Error getting instances", await response.Content.ReadAsStringAsync(), response.StatusCode, response.Headers.ToString());
         }
+
         #endregion
 
         #region String methods
@@ -122,8 +141,8 @@ namespace Wizdom.Client
 
         private async Task<HttpResponseMessage> APIResponseAsync(string path, HttpMethod method = HttpMethod.GET, HttpContent content = null, bool useProxy = false)
         {
-            WizdomTenant tenant = await GetTenantConfig(_wizdomLicenseId);
-            if (tenant == null)
+            WizdomInstance instance = await GetInstanceAsync(_wizdomLicenseId);
+            if (instance == null)
             {
                 throw new AccessDeniedException("Access denied - no license found!");
             }
@@ -133,7 +152,7 @@ namespace Wizdom.Client
             {
                 try
                 {
-                    Uri uri = new Uri(tenant.SharepointSiteUrl);
+                    Uri uri = new Uri(instance.SharepointSiteUrl);
                     resourceid = uri.Scheme + "://" + uri.Host + "/";
                 }
                 catch (Exception)
@@ -154,7 +173,7 @@ namespace Wizdom.Client
 
 
             
-            var url = (useProxy ? baseAddress + $"/proxy/licenseid/{_wizdomLicenseId}" : tenant.WizdomHostUrl) + path;
+            var url = (useProxy ? baseAddress + $"/proxy/licenseid/{_wizdomLicenseId}" : instance.WizdomHostUrl) + path;
             HttpResponseMessage response;
             switch (method)
             {
@@ -184,21 +203,21 @@ namespace Wizdom.Client
             if (response.IsSuccessStatusCode)
             {
                 string s = await response.Content.ReadAsStringAsync();
-                log?.Invoke(s, LogLevel.info);
+                Logger?.Invoke(s, LogLevel.info);
                 return s;
             }
             else
             {
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    log?.Invoke("Error: Access denied!", LogLevel.error);
+                    Logger?.Invoke("Error: Access denied!", LogLevel.error);
                     throw new AccessDeniedException("Error: Access denied!");
                 }
                 else
                 {
-                    log?.Invoke("Error loading data from " + path, LogLevel.error);
+                    Logger?.Invoke("Error loading data from " + path, LogLevel.error);
                     string serverResponse = await response.Content.ReadAsStringAsync();
-                    log?.Invoke(serverResponse, LogLevel.error);
+                    Logger?.Invoke(serverResponse, LogLevel.error);
                     throw new ServerException("Error loading data from " + path, serverResponse, response.StatusCode, response.Headers.ToString());
                 }
             }
@@ -207,36 +226,20 @@ namespace Wizdom.Client
         private async Task<T> APIObjectAsync<T>(string path, HttpMethod method = HttpMethod.GET, HttpContent content = null, bool useProxy = false)
         {
             var response = await APIResponseAsync(path, method, content, useProxy);
-            return await DeserializeStream<T>(response);
+            return await DeserializeStreamAsync<T>(response);
         }
 
-        private async Task<List<WizdomTenant>> GetTenantConfigs()
+        private async Task<WizdomInstance> GetInstanceAsync(int licenseId = 0)
         {
-            if (_wizdomTenants != null) return _wizdomTenants;
+            var instances = await GetInstancesAsync();
 
-            string token = await _tokenHandler?.GetTokenAsync(clientId);
+            if (licenseId == 0 && instances?.Count > 1 && InstanceDecisionHandler != null) licenseId = await InstanceDecisionHandler(instances);
 
-            HttpClientHandler handler = new HttpClientHandler();
-            handler.AllowAutoRedirect = true;
-            handler.MaxAutomaticRedirections = 10;
-            var client = new HttpClient(handler);
-
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            HttpResponseMessage response = await client.GetAsync(baseAddress + "/disco");
-
-            if (response.IsSuccessStatusCode) return await DeserializeStream<List<WizdomTenant>>(response);
-
-            throw new ServerException("Error getting instances", await response.Content.ReadAsStringAsync(), response.StatusCode, response.Headers.ToString());
+            if (licenseId > 0) return instances?.FirstOrDefault(t => t.LicenseID == licenseId);
+            return instances?.FirstOrDefault();
         }
 
-        private async Task<WizdomTenant> GetTenantConfig(int licenseId = 0)
-        {
-            var tenants = await GetTenantConfigs();
-            if (licenseId > 0) return tenants?.FirstOrDefault(t => t.LicenseID == licenseId);
-            return tenants?.FirstOrDefault();
-        }
-
-        private static async Task<T> DeserializeStream<T>(HttpResponseMessage response)
+        private static async Task<T> DeserializeStreamAsync<T>(HttpResponseMessage response)
         {
             using (Stream stream = await response.Content.ReadAsStreamAsync())
             using (StreamReader streamreader = new StreamReader(stream))

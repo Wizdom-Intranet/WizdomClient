@@ -4,23 +4,24 @@ namespace Wizdom.Client
 {
     public class DelegateTokenHandler : ITokenHandler
     {
-        public delegate Task<string> GetToken(string clientId, string resourceId = null);
-        public delegate Task LogOut();
+        public delegate Task<string> GetTokenAsyncDelegate(string clientId, string resourceId = null);
+        public delegate Task LogOutAsyncDelegate();
 
-        public DelegateTokenHandler(GetToken getToken)
+        public DelegateTokenHandler(GetTokenAsyncDelegate getTokenAsync, LogOutAsyncDelegate logOutAsync)
         {
-            _getToken = getToken;
+            _getTokenAsync = getTokenAsync;
+            _logOutAsync = logOutAsync;
         }
-        private GetToken _getToken;
-        private LogOut _logOut;
+        private GetTokenAsyncDelegate _getTokenAsync;
+        private LogOutAsyncDelegate _logOutAsync;
         public async Task<string> GetTokenAsync(string clientId, string resourceId = null)
         {
-            return await _getToken?.Invoke(clientId, resourceId);
+            return await _getTokenAsync?.Invoke(clientId, resourceId);
         }
 
         public async Task LogOutAsync()
         {
-            await _logOut?.Invoke();
+            await _logOutAsync?.Invoke();
             return;
         }
     }

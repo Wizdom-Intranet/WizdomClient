@@ -147,10 +147,11 @@ Enter command (1, 2 | q) > ");
 4: Get environment using proxy
 5: People search (test SharePoint accepts token)
 6: List noticeboard news
+7: List instances
 
 q: Quit
 
-Enter command (1, 2, 3, 4, 5, 6 | q) > ");
+Enter command (1, 2, 3, 4, 5, 6, 7 | q) > ");
                 commandString = Console.ReadKey().KeyChar.ToString();
                 Console.WriteLine("");
                 Console.WriteLine("");
@@ -178,6 +179,13 @@ Enter command (1, 2, 3, 4, 5, 6 | q) > ");
                         break;
                     case "6":
                         await RenderNoticeboardItems();
+                        break;
+                    case "7":
+                        var asdf = await wizdomclient.GetInstancesAsync();
+                        foreach (var item in asdf)
+                        {
+                            Console.WriteLine($"License ID: {item.LicenseID}, name: {item.LicenseName}, tenant: {item.TenantId}");
+                        }
                         break;
                     case "q":
                         Console.WriteLine("Bye!");
